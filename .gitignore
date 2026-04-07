@@ -1,0 +1,48 @@
+# Environment & Secrets
+.env
+*.db
+*.db-shm
+*.db-wal
+audit.db*
+users.db*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+.turbo/
+
+# IDE & Tool configs
+.vscode/
+.idea/
+.cursor/
+.claude/
+.mcp.json
+.opencode.json
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
