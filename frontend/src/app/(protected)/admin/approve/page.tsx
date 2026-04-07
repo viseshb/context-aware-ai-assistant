@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import SignupForm from "@/components/auth/SignupForm";
+import ApprovalForm from "@/components/admin/ApprovalForm";
 
-export default function SignupPage() {
+export default function ApprovePage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background text-text-muted">Loading...</div>}>
-      <SignupForm />
+      <ApprovalForm />
     </Suspense>
   );
 }

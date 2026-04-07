@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
 
+    # Instance mode
+    instance_mode: str = "solo"  # "solo" or "team"
+    team_code: str = ""          # Required for team mode signups
+    frontend_url: str = "http://localhost:3000"
+    admin_email: str = ""        # Falls back to contact_email
+
     # App
     cors_origins_csv: str = "http://localhost:3000"
     log_level: str = "INFO"

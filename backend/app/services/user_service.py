@@ -38,6 +38,12 @@ class UserService:
                     last_login TEXT
                 )
             """)
+            # Migration: add status column if missing
+            import contextlib
+            with contextlib.suppress(sqlite3.OperationalError):
+                self._conn.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+                self._conn.commit()
+
             self._conn.commit()
             log.info("user_db_initialized", path=self._db_path)
         except sqlite3.Error as e:
@@ -56,9 +62,10 @@ class UserService:
         d["allowed_channels"] = json.loads(d["allowed_channels"])
         d["allowed_db_tables"] = json.loads(d["allowed_db_tables"])
         d["is_active"] = bool(d["is_active"])
+        d.setdefault("status", "active")
         return d
 
-    async def create_user(self, username: str, email: str, password: str, role: str = "viewer") -> dict:
+    async def create_user(self, username: str, email: str, password: str, role: str = "viewer", status: str = "active") -> dict:
         assert self._conn
         user_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -66,9 +73,9 @@ class UserService:
         try:
             pw_hash = hash_password(password)
             self._conn.execute(
-                """INSERT INTO users (id, username, email, password_hash, role, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (user_id, username, email, pw_hash, role, now),
+                """INSERT INTO users (id, username, email, password_hash, role, status, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, username, email, pw_hash, role, status, now),
             )
             self._conn.commit()
             log.info("user_created", user_id=user_id, username=username, role=role)
@@ -140,10 +147,21 @@ class UserService:
             log.error("user_list_failed", error=str(e))
             raise
 
+    async def get_pending_users(self) -> list[dict]:
+        assert self._conn
+        try:
+            rows = self._conn.execute(
+                "SELECT * FROM users WHERE status = 'pending' ORDER BY created_at DESC"
+            ).fetchall()
+            return [self._row_to_dict(r) for r in rows]
+        except sqlite3.Error as e:
+            log.error("user_get_pending_failed", error=str(e))
+            raise
+
     async def update_user(self, user_id: str, **fields: object) -> dict | None:
         assert self._conn
         allowed = {
-            "username", "email", "role", "is_active",
+            "username", "email", "role", "status", "is_active",
             "allowed_repos", "allowed_channels", "allowed_db_tables",
         }
         updates = {}

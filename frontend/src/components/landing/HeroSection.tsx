@@ -83,20 +83,21 @@ export default function HeroSection() {
               ))}
             </div>
 
-            {/* CTA */}
+            {/* CTA — Solo / Team */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
-                href="/signup"
+                href="/login"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-cta hover:bg-cta-hover text-background font-semibold rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-cta/25 cursor-pointer"
               >
-                Get Started
+                For You
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/login"
+                href="/signup?mode=team"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-border hover:border-panel-secondary text-foreground font-medium rounded-xl transition-colors cursor-pointer"
               >
-                Log in
+                For Your Team
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </motion.div>
