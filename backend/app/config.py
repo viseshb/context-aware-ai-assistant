@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     claude_cli_path: str = "claude"
+    claude_cli_model: str = "sonnet"
 
     # Data sources
     github_token: str = ""

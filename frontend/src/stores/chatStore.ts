@@ -13,6 +13,19 @@ export interface ContextSource {
   detail: string;
 }
 
+export interface ChatMetrics {
+  model_id: string;
+  ttft_ms: number | null;
+  total_time_ms: number;
+  tool_time_ms: number;
+  tool_call_count: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cost_usd: number | null;
+  provider_model: string;
+  response_chars: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -21,22 +34,32 @@ export interface ChatMessage {
   contextSources: ContextSource[];
   timestamp: number;
   modelId?: string;
+  metrics?: ChatMetrics | null;
 }
 
 interface ChatState {
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingContent: string;
+  streamingToolName: string | null;
   conversationId: string;
   selectedModelId: string | null;
+  hasEnteredChat: boolean;
 
   addUserMessage: (content: string) => void;
   startStreaming: () => void;
   appendStreamChunk: (chunk: string) => void;
+  setStreamingToolName: (toolName: string | null) => void;
   addToolCall: (tool: ToolCall) => void;
-  finishStreaming: (contextSources: ContextSource[], modelId: string) => void;
+  finishStreaming: (
+    contextSources: ContextSource[],
+    modelId: string,
+    toolCalls?: ToolCall[],
+    metrics?: ChatMetrics | null,
+  ) => void;
   setStreamError: (error: string) => void;
   setSelectedModel: (modelId: string) => void;
+  setHasEnteredChat: (value: boolean) => void;
   clearMessages: () => void;
   newConversation: () => void;
 }
@@ -47,8 +70,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isStreaming: false,
   streamingContent: "",
+  streamingToolName: null,
   conversationId: crypto.randomUUID(),
   selectedModelId: null,
+  hasEnteredChat: false,
 
   addUserMessage: (content) => {
     set((state) => ({
@@ -61,13 +86,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           toolCalls: [],
           contextSources: [],
           timestamp: Date.now(),
+          metrics: null,
         },
       ],
     }));
   },
 
   startStreaming: () => {
-    set({ isStreaming: true, streamingContent: "" });
+    set({ isStreaming: true, streamingContent: "", streamingToolName: null });
   },
 
   appendStreamChunk: (chunk) => {
@@ -76,6 +102,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
+  setStreamingToolName: (toolName) => set({ streamingToolName: toolName }),
+
   addToolCall: (_tool) => {
     // Tool calls are accumulated during streaming and attached to the final message
     set((state) => ({
@@ -83,21 +111,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
-  finishStreaming: (contextSources, modelId) => {
+  finishStreaming: (contextSources, modelId, toolCalls = [], metrics = null) => {
     const { streamingContent } = get();
     set((state) => ({
       isStreaming: false,
       streamingContent: "",
+      streamingToolName: null,
       messages: [
         ...state.messages,
         {
           id: `msg-${++msgCounter}`,
           role: "assistant",
           content: streamingContent,
-          toolCalls: [],
+          toolCalls,
           contextSources,
           timestamp: Date.now(),
           modelId,
+          metrics,
         },
       ],
     }));
@@ -107,6 +137,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       isStreaming: false,
       streamingContent: "",
+      streamingToolName: null,
       messages: [
         ...state.messages,
         {
@@ -116,19 +147,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
           toolCalls: [],
           contextSources: [],
           timestamp: Date.now(),
+          metrics: null,
         },
       ],
     }));
   },
 
   setSelectedModel: (modelId) => set({ selectedModelId: modelId }),
+  setHasEnteredChat: (value) => set({ hasEnteredChat: value }),
 
-  clearMessages: () => set({ messages: [], streamingContent: "" }),
+  clearMessages: () => set({ messages: [], streamingContent: "", streamingToolName: null, hasEnteredChat: false }),
 
   newConversation: () =>
     set({
       messages: [],
       streamingContent: "",
+      streamingToolName: null,
       conversationId: crypto.randomUUID(),
+      hasEnteredChat: false,
     }),
 }));

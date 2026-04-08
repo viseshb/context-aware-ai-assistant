@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Bot } from "lucide-react";
 import ContactModal from "./ContactModal";
 
@@ -9,11 +10,24 @@ export default function Footer() {
 
   return (
     <>
-      <footer className="border-t border-border py-8 px-4 sm:px-6 lg:px-8">
+      <motion.footer
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, amount: 0.6 }}
+        transition={{ duration: 0.35 }}
+        className="border-t border-border py-8 px-4 sm:px-6 lg:px-8"
+      >
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-text-muted text-sm">
             <Bot className="w-4 h-4 text-cta" />
-            <span>Created by Visesh Bentula</span>
+            <a
+              href="https://viseshb.github.io/My-Portfolio/"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-cta transition-colors"
+            >
+              Created by Visesh Bentula
+            </a>
           </div>
 
           <button
@@ -23,7 +37,7 @@ export default function Footer() {
             Contact Us
           </button>
         </div>
-      </footer>
+      </motion.footer>
 
       <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />
     </>

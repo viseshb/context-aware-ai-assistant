@@ -1,6 +1,8 @@
-"""Google Gemini provider — 4 model variants."""
+"""Google Gemini provider - 4 model variants."""
 from __future__ import annotations
 
+import importlib
+import json
 from typing import AsyncIterator
 
 from app.config import settings
@@ -10,11 +12,41 @@ from app.utils.logging import get_logger
 log = get_logger("llm.gemini")
 
 GEMINI_MODELS = {
-    "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite",
-    "gemini-2.5-flash": "Gemini 2.5 Flash",
-    "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
-    "gemini-3-flash": "Gemini 3 Flash",
+    "gemini-2.5-flash-lite": {
+        "display": "Gemini 2.5 Flash Lite",
+        "api_model": "gemini-2.5-flash-lite",
+    },
+    "gemini-2.5-flash": {
+        "display": "Gemini 2.5 Flash",
+        "api_model": "gemini-2.5-flash",
+    },
+    "gemini-3.1-flash-lite": {
+        "display": "Gemini 3.1 Flash Lite",
+        "api_model": "gemini-3.1-flash-lite-preview",
+    },
+    "gemini-3-flash": {
+        "display": "Gemini 3 Flash",
+        "api_model": "gemini-3-flash-preview",
+    },
 }
+
+
+def gemini_sdk_available() -> bool:
+    try:
+        importlib.import_module("google.genai")
+        return True
+    except Exception:
+        return False
+
+
+def _load_genai_module():
+    try:
+        return importlib.import_module("google.genai")
+    except Exception as e:
+        raise RuntimeError(
+            "Gemini SDK is not installed. Install backend dependencies with "
+            "`pip install -r backend/requirements.txt`."
+        ) from e
 
 
 def _build_system_instruction(messages: list[Message]) -> str | None:
@@ -22,11 +54,50 @@ def _build_system_instruction(messages: list[Message]) -> str | None:
     return "\n".join(parts) if parts else None
 
 
+def _parse_tool_arguments(raw: str | dict | None) -> dict:
+    if isinstance(raw, dict):
+        return raw
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"raw": raw}
+
+
 def _build_contents(messages: list[Message]) -> list[dict]:
-    return [
-        {"role": "user" if m.role == "user" else "model", "parts": [{"text": m.content}]}
-        for m in messages if m.role != "system"
-    ]
+    contents: list[dict] = []
+    for message in messages:
+        if message.role == "system":
+            continue
+        if message.role == "assistant" and message.tool_calls:
+            parts = []
+            if message.content:
+                parts.append({"text": message.content})
+            # Gemini preview models can reject replayed function calls unless the original
+            # thought signature is preserved. We don't retain that provider-specific field,
+            # so only carry assistant text forward and rely on the functionResponse turn.
+            if parts:
+                contents.append({"role": "model", "parts": parts})
+            continue
+        if message.role == "tool":
+            function_response: dict = {
+                "name": message.tool_name,
+                "response": {"result": message.content},
+            }
+            if message.tool_call_id:
+                function_response["id"] = message.tool_call_id
+            contents.append({
+                "role": "user",
+                "parts": [{"functionResponse": function_response}],
+            })
+            continue
+
+        contents.append({
+            "role": "user" if message.role == "user" else "model",
+            "parts": [{"text": message.content}],
+        })
+    return contents
 
 
 def _build_tools(tools: list[ToolDefinition]) -> list[dict]:
@@ -36,6 +107,8 @@ def _build_tools(tools: list[ToolDefinition]) -> list[dict]:
 
 def _extract_events_from_parts(parts) -> list[ChatEvent]:
     events = []
+    if not parts:
+        return events
     for part in parts:
         if hasattr(part, "function_call") and part.function_call:
             fc = part.function_call
@@ -43,7 +116,7 @@ def _extract_events_from_parts(parts) -> list[ChatEvent]:
                 type=ChatEventType.TOOL_CALL,
                 tool_name=fc.name,
                 tool_args=dict(fc.args) if fc.args else {},
-                tool_call_id=f"call_{fc.name}",
+                tool_call_id=getattr(fc, "id", None) or f"call_{fc.name}",
             ))
         elif hasattr(part, "text") and part.text:
             events.append(ChatEvent(type=ChatEventType.TEXT_CHUNK, content=part.text))
@@ -54,7 +127,9 @@ class GeminiProvider(LLMProvider):
     def __init__(self, model_id: str):
         self.provider_name = "google"
         self.model_id = model_id
-        self.display_name = GEMINI_MODELS.get(model_id, model_id)
+        info = GEMINI_MODELS.get(model_id, {"display": model_id, "api_model": model_id})
+        self.display_name = info["display"]
+        self._api_model = info["api_model"]
         self.tier = "free"
         self.supports_tools = True
         self.supports_streaming = True
@@ -65,7 +140,12 @@ class GeminiProvider(LLMProvider):
         tools: list[ToolDefinition] | None = None,
         stream: bool = True,
     ) -> AsyncIterator[ChatEvent]:
-        from google import genai
+        try:
+            genai = _load_genai_module()
+        except RuntimeError as e:
+            log.error("gemini_sdk_missing", model=self.model_id, error=str(e))
+            yield ChatEvent(type=ChatEventType.ERROR, error=str(e))
+            return
 
         client = genai.Client(api_key=settings.google_api_key)
         config = self._build_config(messages, tools)
@@ -92,20 +172,21 @@ class GeminiProvider(LLMProvider):
             config["tools"] = _build_tools(tools)
         return config or None
 
-    def _stream(self, client, contents, config):
+    async def _stream(self, client, contents, config):
         response = client.models.generate_content_stream(
-            model=self.model_id, contents=contents, config=config,
+            model=self._api_model, contents=contents, config=config,
         )
         for chunk in response:
-            if chunk.candidates:
-                yield from _extract_events_from_parts(chunk.candidates[0].content.parts)
+            if chunk.candidates and getattr(chunk.candidates[0], "content", None):
+                for event in _extract_events_from_parts(getattr(chunk.candidates[0].content, "parts", None)):
+                    yield event
 
     def _non_stream(self, client, contents, config):
         response = client.models.generate_content(
-            model=self.model_id, contents=contents, config=config,
+            model=self._api_model, contents=contents, config=config,
         )
-        if response.candidates:
-            yield from _extract_events_from_parts(response.candidates[0].content.parts)
+        if response.candidates and getattr(response.candidates[0], "content", None):
+            yield from _extract_events_from_parts(getattr(response.candidates[0].content, "parts", None))
 
     async def health_check(self) -> bool:
-        return bool(settings.google_api_key)
+        return bool(settings.google_api_key) and gemini_sdk_available()

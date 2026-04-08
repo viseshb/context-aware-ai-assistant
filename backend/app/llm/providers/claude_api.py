@@ -1,6 +1,8 @@
 """Claude API provider via Anthropic SDK."""
 from __future__ import annotations
 
+import importlib
+import json
 from typing import AsyncIterator
 
 from app.config import settings
@@ -8,6 +10,35 @@ from app.llm.base import ChatEvent, ChatEventType, LLMProvider, Message, ToolDef
 from app.utils.logging import get_logger
 
 log = get_logger("llm.claude_api")
+
+
+def anthropic_sdk_available() -> bool:
+    try:
+        importlib.import_module("anthropic")
+        return True
+    except Exception:
+        return False
+
+
+def _load_anthropic_module():
+    try:
+        return importlib.import_module("anthropic")
+    except Exception as e:
+        raise RuntimeError(
+            "Anthropic SDK is not installed. Install backend dependencies with "
+            "`pip install -r backend/requirements.txt`."
+        ) from e
+
+
+def _parse_tool_arguments(raw: str | dict | None) -> dict:
+    if isinstance(raw, dict):
+        return raw
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"raw": raw}
 
 
 def _split_messages(messages: list[Message]) -> tuple[str, list[dict]]:
@@ -22,6 +53,19 @@ def _split_messages(messages: list[Message]) -> tuple[str, list[dict]]:
                 "role": "user",
                 "content": [{"type": "tool_result", "tool_use_id": msg.tool_call_id, "content": msg.content}],
             })
+        elif msg.role == "assistant" and msg.tool_calls:
+            blocks = []
+            if msg.content:
+                blocks.append({"type": "text", "text": msg.content})
+            for tool_call in msg.tool_calls:
+                function = tool_call.get("function", {})
+                blocks.append({
+                    "type": "tool_use",
+                    "id": tool_call.get("id") or f"call_{function.get('name', 'tool')}",
+                    "name": function.get("name", ""),
+                    "input": _parse_tool_arguments(function.get("arguments")),
+                })
+            conv.append({"role": "assistant", "content": blocks})
         else:
             conv.append({"role": msg.role, "content": msg.content})
     return "\n".join(system_parts), conv
@@ -61,9 +105,14 @@ class ClaudeAPIProvider(LLMProvider):
         tools: list[ToolDefinition] | None = None,
         stream: bool = True,
     ) -> AsyncIterator[ChatEvent]:
-        from anthropic import AsyncAnthropic
+        try:
+            anthropic = _load_anthropic_module()
+        except RuntimeError as e:
+            log.error("claude_api_sdk_missing", error=str(e))
+            yield ChatEvent(type=ChatEventType.ERROR, error=str(e))
+            return
 
-        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         kwargs = self._build_request(messages, tools)
 
         try:
@@ -103,4 +152,4 @@ class ClaudeAPIProvider(LLMProvider):
         return _extract_from_content_blocks(response.content)
 
     async def health_check(self) -> bool:
-        return bool(settings.anthropic_api_key)
+        return bool(settings.anthropic_api_key) and anthropic_sdk_available()

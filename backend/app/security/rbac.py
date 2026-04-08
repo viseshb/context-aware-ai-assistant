@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 
 from app.utils.errors import AuthorizationError
 
@@ -13,6 +14,8 @@ ROLES = {"admin", "member", "viewer"}
 TOOL_CATEGORIES = {
     "github": [
         "github_list_repos",
+        "github_get_repo_metrics",
+        "github_count_commits",
         "github_search_code",
         "github_get_issues",
         "github_get_pull_requests",
@@ -84,8 +87,19 @@ def validate_tool_call(user: dict, tool_name: str, args: dict) -> None:
         raise AuthorizationError(f"Unknown tool: {tool_name}")
 
     if category == "github":
-        repo = args.get("repo") or args.get("org", "")
+        repo = args.get("repo", "")
+        org = args.get("org", "")
         allowed_repos = user.get("allowed_repos", [])
+        if tool_name == "github_list_repos":
+            if not allowed_repos:
+                raise AuthorizationError("You have no GitHub repository access.")
+            if org and not _allow_org_listing(org, allowed_repos):
+                raise AuthorizationError(
+                    f"You don't have access to list repositories for '{org}'. "
+                    f"Your allowed repos: {allowed_repos}"
+                )
+            return
+        repo = repo or org
         if not _matches_allowlist(repo, allowed_repos):
             raise AuthorizationError(
                 f"You don't have access to repository '{repo}'. "
@@ -128,3 +142,69 @@ def _matches_allowlist(resource: str, allowed: list[str]) -> bool:
     if "*" in allowed:
         return True
     return any(fnmatch.fnmatch(resource, pattern) for pattern in allowed)
+
+
+def _allow_org_listing(org: str, allowed_repos: list[str]) -> bool:
+    if not allowed_repos:
+        return False
+    if "*" in allowed_repos:
+        return True
+
+    normalized_org = org.lower()
+    for pattern in allowed_repos:
+        if "/" in pattern:
+            owner = pattern.split("/", 1)[0].lower()
+            if owner == normalized_org or fnmatch.fnmatch(f"{normalized_org}/placeholder", pattern.lower()):
+                return True
+        elif fnmatch.fnmatch(normalized_org, pattern.lower()):
+            return True
+    return False
+
+
+def filter_tool_result_for_user(user: dict, tool_name: str, result: str) -> str:
+    """Filter list-style tool results to match the user's allowlists."""
+    if user.get("role") == "admin":
+        return result
+
+    try:
+        payload = json.loads(result)
+    except Exception:
+        return result
+
+    if not isinstance(payload, list):
+        return result
+
+    if tool_name == "github_list_repos":
+        allowed_repos = user.get("allowed_repos", [])
+        filtered = [
+            repo for repo in payload
+            if isinstance(repo, dict) and _matches_allowlist(str(repo.get("name", "")), allowed_repos)
+        ]
+        return json.dumps(filtered, indent=2)
+
+    if tool_name == "slack_list_channels":
+        allowed_channels = user.get("allowed_channels", [])
+        filtered = [
+            channel for channel in payload
+            if isinstance(channel, dict)
+            and (
+                _matches_allowlist(str(channel.get("name", "")), allowed_channels)
+                or _matches_allowlist(str(channel.get("id", "")), allowed_channels)
+            )
+        ]
+        return json.dumps(filtered, indent=2)
+
+    if tool_name == "db_list_tables":
+        allowed_tables = user.get("allowed_db_tables", [])
+        filtered = []
+        for table in payload:
+            if not isinstance(table, dict):
+                continue
+            table_name = str(table.get("table", ""))
+            schema = str(table.get("schema", ""))
+            qualified = f"{schema}.{table_name}" if schema else table_name
+            if _matches_allowlist(qualified, allowed_tables) or _matches_allowlist(table_name, allowed_tables):
+                filtered.append(table)
+        return json.dumps(filtered, indent=2)
+
+    return result

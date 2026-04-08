@@ -18,7 +18,7 @@ export default function LandingNavbar() {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-panel/80 backdrop-blur-xl border-b border-border shadow-lg shadow-black/20"
+          ? "bg-panel/80 backdrop-blur-xl shadow-lg shadow-black/20"
           : "bg-transparent"
       }`}
     >
@@ -40,13 +40,13 @@ export default function LandingNavbar() {
               href="/login"
               className="px-4 py-2 text-sm font-medium text-text-muted hover:text-foreground transition-colors cursor-pointer"
             >
-              Log in
+              For You
             </Link>
             <Link
-              href="/signup"
+              href="/signup?mode=team"
               className="px-5 py-2 text-sm font-semibold bg-cta hover:bg-cta-hover text-background rounded-lg transition-colors cursor-pointer"
             >
-              Sign Up
+              For Your Team
             </Link>
           </div>
 
@@ -70,14 +70,14 @@ export default function LandingNavbar() {
               className="block px-4 py-2 text-sm font-medium text-text-muted hover:text-foreground"
               onClick={() => setMobileOpen(false)}
             >
-              Log in
+              For You
             </Link>
             <Link
-              href="/signup"
+              href="/signup?mode=team"
               className="block px-4 py-2 text-sm font-semibold bg-cta hover:bg-cta-hover text-background rounded-lg text-center"
               onClick={() => setMobileOpen(false)}
             >
-              Sign Up
+              For Your Team
             </Link>
           </div>
         </div>

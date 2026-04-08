@@ -3,7 +3,12 @@
 ## Project Overview
 A production-grade, open-source Context-Aware AI Assistant using MCP (Model Context Protocol) to integrate GitHub, Slack, and PostgreSQL. Users query code repositories, team discussions, and database metrics via natural language across 10 switchable LLM providers. Built with FastAPI (Python) backend and Next.js (React) frontend.
 
-**This is a real portfolio project going on the user's resume and will be open-sourced on GitHub. It must be professional, fully functional, and impressive.**
+**This is a real portfolio project on the user's resume and open-sourced on GitHub. It must be professional, fully functional, and impressive.**
+
+## Editing Preference
+- Make minimal, surgical changes by default.
+- Prefer patching the existing file or section instead of rewriting whole files.
+- Only rewrite an entire file when a full replacement is genuinely necessary or explicitly requested.
 
 ## Tech Stack (DO NOT CHANGE)
 
@@ -14,29 +19,46 @@ A production-grade, open-source Context-Aware AI Assistant using MCP (Model Cont
 - **httpx** for async HTTP (GitHub API, Slack API)
 - **asyncpg** for PostgreSQL
 - **matplotlib** for chart generation
-- **presidio-analyzer + presidio-anonymizer** for PII detection/redaction
 - **slowapi** for rate limiting
 - **sqlparse** for SQL read-only enforcement
-- **python-jose + passlib[bcrypt]** for JWT auth
-- **structlog** for logging
+- **bcrypt** + **python-jose** for auth
+- **structlog** + **rich** for pretty colored logging
+- **aiosmtplib** for email (approval notifications, contact form)
 
 ### Frontend
-- **Next.js 16.2** (App Router) — Devtools MCP, context-aware diagnostics, auto error stack traces, React Compiler
-- **React 19**
-- **TypeScript** (strict)
+- **Next.js 16.2** (App Router) — Devtools MCP, context-aware diagnostics, React Compiler
+- **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4**
 - **Zustand** for state management
-- **@tanstack/react-query** for server state
 - **Framer Motion** for animations
+- **react-markdown + remark-gfm + react-syntax-highlighter** for rich rendering
 - **Recharts** for inline charts
-- **react-markdown + remark-gfm** for markdown rendering
-- **react-syntax-highlighter** for code blocks
-- **Lucide React** for icons (SVG, NEVER emojis as icons)
-- **@fontsource/plus-jakarta-sans** for typography
+- **Lucide React** for icons (SVG, NEVER emojis)
+- **canvas-confetti** for approval celebration
+- **Plus Jakarta Sans** font
+
+## Instance Modes
+
+### Solo Mode (`INSTANCE_MODE=solo`)
+- Admin created via CLI only — NO signup in UI
+- Landing "For You" → Login page
+- Single user, full access
+
+### Team Mode (`INSTANCE_MODE=team`)
+- Admin created via CLI
+- Team members sign up with `TEAM_CODE` → pending → admin approves via email
+- Admin assigns role (member/viewer) + permissions (repos/channels/tables)
+- Approved users see confetti → redirect to chat
+
+### Admin CLI
+```bash
+cd backend
+python -m app.security.jwt_auth create-admin --username visesh --email visesh66@gmail.com
+```
 
 ## LLM Models (10 Providers, NO Default)
 
-User MUST select a model before chatting. No default model. Model selector is a card grid, NOT a dropdown.
+User MUST select a model before chatting. Model selector is a card grid, NOT a dropdown.
 
 | Model | Provider | Tier |
 |-------|----------|------|
@@ -51,156 +73,169 @@ User MUST select a model before chatting. No default model. Model selector is a 
 | Claude API | Anthropic SDK | Paid |
 | OpenAI gpt-4.1-mini | OpenAI SDK | Paid |
 
-All API keys configured via `.env` file.
+## System Prompt
+
+The chatbot system prompt lives in `backend/app/services/chat_service.py` in the `SYSTEM_PROMPT` constant. This controls how the AI assistant behaves, responds, and uses tools. Update this to change the assistant's personality or instructions.
 
 ## UI/UX Rules (CRITICAL)
 
 ### Design System
-- **Background:** `#0F172A` (slate-950)
-- **Panels:** `#1E293B` (slate-800)
-- **CTA/Active:** `#22C55E` (green-500)
-- **Text:** `#F8FAFC` (slate-50)
-- **Text Muted:** `#94A3B8` (slate-400)
-- **Font:** Plus Jakarta Sans (all text)
+- **Background:** `#0F172A` | **Panels:** `#1E293B` | **CTA:** `#22C55E`
+- **Text:** `#F8FAFC` | **Muted:** `#94A3B8` | **Font:** Plus Jakarta Sans
 - **Glass cards:** `bg-slate-800/70 backdrop-blur-xl border border-white/[0.08]`
 
 ### Design Principles
-- **NOT AI SLOP** — Do NOT make it look like a generic ChatGPT/AI chatbot clone
-- User messages: right-aligned with green-tinted background
-- Assistant messages: left-aligned with panel background
-- NOT centered ChatGPT-style layout
-- Tool execution: collapsible cards with green progress animation
-- Context badges: color-coded pills (GitHub=gray, Slack=purple, DB=blue)
-- All transitions: 150-300ms, smooth
-- Respect `prefers-reduced-motion`
-
-### Icon Rules
-- ONLY use Lucide React (SVG icons)
-- NEVER use emojis as UI icons
-- Consistent sizing: 24x24 viewBox, w-6 h-6
-
-### Pre-Delivery Checklist (run before every UI commit)
-- [ ] No emojis used as icons
-- [ ] All clickable elements have `cursor-pointer`
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light/dark text contrast >= 4.5:1
-- [ ] Focus states visible for keyboard navigation
-- [ ] Responsive at 375px, 768px, 1024px, 1440px
-- [ ] No horizontal scroll on mobile
+- **NOT AI SLOP** — unique dark-mode design, not a ChatGPT clone
+- User messages: right-aligned, green-tinted bg
+- Assistant messages: left-aligned, panel bg
+- Tool execution: collapsible cards with green progress
+- Context badges: GitHub=gray, Slack=purple, DB=blue
+- Transitions: 150-300ms, respect `prefers-reduced-motion`
+- Icons: Lucide React SVG only, NEVER emojis
+- All clickable elements: `cursor-pointer`
 
 ## Authentication & RBAC
 
 ### User Flow
-1. **Landing page** (`/`) — public, trendy marketing page explaining the tool
-2. **Sign up** (`/signup`) — creates account with `viewer` role (no tool access)
-3. **Login** (`/login`) — returns JWT token + user profile with role/permissions
-4. **Chat** (`/chat`) — protected, requires auth. Tool access based on RBAC role
-5. **Admin** (`/admin`) — protected, requires admin role. User/permission management
+- Landing (`/`) → "For You" (→ login) | "For Your Team" (→ signup with team code)
+- Solo: admin logs in directly, no signup
+- Team: signup → pending → admin approves → confetti → login → chat
+- Header shows: "Hello, {username}" + colored role badge (admin=green, member=blue, viewer=gray)
 
 ### Roles
-- **admin** — full access: all tools, all resources, settings, user management
-- **member** — assigned access: only their permitted repos/channels/tables
-- **viewer** — chat only: LLM answers from its own knowledge, no tool calls
+- **admin** — full access, user management, all tools
+- **member** — assigned repos/channels/tables only
+- **viewer** — chat only, no tool access
 
-### First Admin
-```bash
-python -m app.security.jwt_auth create-admin --username admin --email admin@local
-```
+### JWT
+- Secret auto-generated per server start (tokens expire on restart)
+- Expiry: 30 minutes (`JWT_EXPIRY_MINUTES`)
 
-## Security (NO COMPROMISE)
+## Security (NO COMPROMISE — 8 Layers)
 
-### 8-Layer Defense-in-Depth
-1. **Authentication** — ALL users must login, JWT + bcrypt, 24h token expiry
-2. **RBAC** — role-based tool filtering, per-user resource allowlists, checked BEFORE every tool call
-3. **Rate Limiting** — 30 req/min REST, 20 msg/min WebSocket, 5 login attempts/min (brute force)
-4. **Input Validation** — Pydantic schemas, max 10,000 char messages, password strength requirements
-5. **Allowlist Enforcement** — per-user allowed repos/channels/tables, validated BEFORE tool execution
-6. **Read-Only Enforcement** — SQL parsed with sqlparse (only SELECT), SET TRANSACTION READ ONLY, GitHub GET-only, Slack read-only scopes
-7. **PII Filtering** — presidio scans ALL LLM responses, redacts emails/phones/SSNs/credit cards/IPs
-8. **Audit Logging** — every action logged with user_id: tool calls, security events, login attempts, PII redactions
-
-### Security Rules
-- NEVER allow SQL mutations (INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, GRANT)
-- NEVER expose API keys in frontend or API responses
-- ALWAYS validate tool call arguments against user's RBAC permissions BEFORE execution
-- ALWAYS scan LLM output for PII BEFORE sending to frontend
-- ALWAYS log security-relevant events to audit log with user attribution
-- Viewer role users NEVER get tool access — LLM answers from its own knowledge only
+1. **Authentication** — JWT + bcrypt, 30-min expiry
+2. **RBAC** — role-based tool filtering, checked BEFORE every tool call
+3. **Rate Limiting** — 30 req/min REST, brute force protection
+4. **Input Validation** — Pydantic schemas, max 10K chars, password strength
+5. **Allowlists** — per-user repos/channels/tables
+6. **Read-Only SQL** — sqlparse blocks mutations, READ ONLY transactions
+7. **PII Filtering** — auto-redact emails, phones, SSNs, credit cards, API keys
+8. **Audit Logging** — every action logged with user_id, tool, args, timestamp
 
 ## Architecture
 
-### Backend Structure
+### Backend
 ```
 backend/app/
-├── main.py          # FastAPI app, lifespan, CORS
-├── config.py        # Pydantic Settings from .env
-├── api/             # REST + WebSocket endpoints
-├── llm/             # LLM provider abstraction + 5 provider implementations
-├── mcp_layer/       # MCP client, manager, 3 MCP servers (GitHub/Slack/Postgres)
-├── security/        # PII filter, allowlists, rate limiter, read-only, JWT auth, audit log
-├── services/        # Chat orchestrator, summarizer, chart service, context tracker
-├── schemas/         # Pydantic models
-└── utils/           # Logging, error handlers
+├── main.py              # FastAPI app, lifespan, CORS, rate limiting
+├── config.py            # Pydantic Settings (.env loading)
+├── dependencies.py      # Singletons: user_service, llm_registry, mcp_manager
+├── api/
+│   ├── auth.py          # signup (mode-aware), login (status-aware), /me
+│   ├── chat.py          # WebSocket streaming + REST fallback
+│   ├── models.py        # GET /api/models (auth-protected)
+│   ├── admin.py         # User mgmt, approval endpoints, audit logs
+│   ├── contact.py       # Email contact form
+│   ├── context.py       # Data source status + RBAC info
+│   ├── setup.py         # Instance mode info (public)
+│   └── approval_status.py  # SSE for pending users
+├── llm/
+│   ├── base.py          # LLMProvider ABC, ChatEvent, Message
+│   ├── registry.py      # Register/list/get providers
+│   ├── tool_adapter.py  # MCP tools → LLM format + RBAC filtering
+│   └── providers/
+│       ├── _openai_compat.py  # Shared helpers for OpenAI-format APIs
+│       ├── gemini.py          # 4 Google models
+│       ├── nvidia.py          # 3 NVIDIA NIM models
+│       ├── claude_api.py      # Anthropic SDK
+│       ├── claude_cli.py      # CLI subprocess (cmd.exe /c claude -p)
+│       └── openai_provider.py # GPT-4.1-mini
+├── mcp_layer/
+│   ├── manager.py       # Tool registration, execution routing
+│   └── servers/
+│       ├── github_server.py   # 7 tools (live GitHub API)
+│       ├── slack_server.py    # 5 tools (live Slack API)
+│       └── postgres_server.py # 4 tools (live DB queries)
+├── security/
+│   ├── jwt_auth.py      # JWT create/decode, bcrypt, CLI create-admin
+│   ├── rbac.py          # Role checks, tool filtering, allowlist matching
+│   ├── pii_filter.py    # Regex PII detection + redaction
+│   ├── read_only.py     # SQL mutation blocking
+│   ├── rate_limiter.py  # slowapi middleware
+│   └── audit_log.py     # SQLite audit trail
+├── services/
+│   ├── chat_service.py  # Orchestrator: LLM + MCP tools + security
+│   ├── user_service.py  # SQLite user CRUD + status + RBAC
+│   └── email_service.py # Approval + notification emails
+├── schemas/             # Pydantic models (auth, chat, settings)
+└── utils/
+    ├── logging.py       # Rich colored structured logging
+    └── errors.py        # AppError hierarchy + unhandled exception handler
 ```
 
-### Frontend Structure
+### Frontend
 ```
 frontend/src/
-├── app/             # Next.js App Router pages
-│   ├── page.tsx         # Landing page (public)
-│   ├── (auth)/          # Login + Signup pages
-│   ├── (protected)/     # Chat + Admin (require auth)
-│   └── middleware.ts    # JWT route protection
-├── components/      # UI components (landing, auth, layout, chat, model, context, tools, rich, admin, ui)
-├── stores/          # Zustand stores (chat, model, auth, ui)
-├── hooks/           # Custom hooks (useChat, useModels, useAuth)
-├── services/        # API client, WebSocket client
-└── config/          # Theme tokens, model metadata
+├── app/
+│   ├── page.tsx                          # Landing page
+│   ├── (auth)/login/page.tsx             # Login (solo: primary entry)
+│   ├── (auth)/signup/page.tsx            # Signup (team: with team code)
+│   ├── (auth)/pending/page.tsx           # Waiting for approval + confetti
+│   ├── (protected)/chat/page.tsx         # Chat with data source status bar
+│   ├── (protected)/admin/page.tsx        # Admin panel (users, audit, system)
+│   └── (protected)/admin/approve/page.tsx # Approval form (from email link)
+├── components/
+│   ├── landing/    # Navbar, Hero, Features, HowItWorks, Security, CTA, Footer, Contact
+│   ├── auth/       # LoginForm, SignupForm, PendingApproval
+│   ├── chat/       # ChatArea, MessageBubble, InputBar, StreamingIndicator, WelcomeScreen
+│   ├── model/      # ModelSelector (card grid), ModelBadge
+│   ├── rich/       # MarkdownRenderer, CodeBlock (syntax highlight + copy)
+│   ├── context/    # ContextBadge (GitHub/Slack/DB pills)
+│   ├── tools/      # ToolExecutionCard (collapsible)
+│   ├── admin/      # AdminPanel, ApprovalForm
+│   └── layout/     # Header ("Hello, username" + role badge)
+├── stores/         # authStore (JWT + status + pending), chatStore (messages + streaming)
+├── services/       # api.ts (fetch wrapper), websocket.ts (reconnecting WS)
+└── config/         # models.ts (10 model metadata)
 ```
 
-### MCP Servers
-- Each runs as a **subprocess** using **stdio transport**
-- MCPManager spawns/manages all servers on FastAPI startup
-- GitHub server: 7 read-only tools
-- Slack server: 5 read-only tools
-- Postgres server: 4 read-only tools (SQL validated)
+## Landing Page
+- Navbar: "For You" | "For Your Team" (NOT "Login" / "Sign Up")
+- Hero: animated chat preview, "For You" + "For Your Team" CTA buttons
+- Features: bento grid (GitHub, Slack, PostgreSQL)
+- HowItWorks: 3-step flow
+- SecurityBadges: 8 security layers
+- CTAFooter: "For You" + "For Your Team" buttons
+- Footer: "Created by Visesh Bentula" + Contact Us modal
+- All pages have "← Back to home" links
 
-## Development Commands
+## Development
 
 ```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+# Start both backend + frontend
+npm run dev
 
-# Frontend
-cd frontend
-npm install
-npm run dev  # runs on port 3000
+# Backend only
+npm run dev:backend
 
-# Tests
-cd backend && python -m pytest tests/ -v
+# Frontend only
+npm run dev:frontend
 
-# Admin setup
-cd backend && python -m app.security.admin_auth create-admin
+# Create admin
+cd backend && python -m app.security.jwt_auth create-admin --username admin --email admin@local
+
+# Build
+npm run build
 ```
 
-## Plan File
-Full implementation plan: `.claude/plans/flickering-crunching-giraffe.md`
-
-## Landing Page + Footer
-- Landing page at `/` is public (no auth required)
-- Sections: LandingNavbar, HeroSection (animated), FeaturesGrid (bento), HowItWorks, SecurityBadges, CTAFooter, Footer
-- **Footer:** "Created by Visesh Bentula" + "Contact Us" link
-- **Contact Us:** Opens modal with Name, Email, Subject, Body fields + "Send Email" button
-- **Contact backend:** `POST /api/contact` sends email to `visesh66@gmail.com` (HARDCODED in backend .env, NEVER exposed to frontend)
-- Contact email is rate-limited to 3/min per IP
-
 ## Key Decisions (DO NOT OVERRIDE)
-- WebSocket for real-time chat streaming, REST for metadata endpoints
-- MCP servers as subprocesses (stdio), not HTTP
-- Zustand over Redux (lightweight, no boilerplate)
+- WebSocket for chat streaming, REST for metadata
+- MCP tools call live APIs (GitHub, Slack) — NOT stored data
+- PostgreSQL tools query user's existing DB — NOT a separate store
+- Zustand over Redux (lightweight)
 - Model selector is a card grid, NOT a dropdown
-- No database for conversation history in MVP (lives in Zustand)
-- Tailwind v4 with CSS-native config
-- Claude CLI provider uses subprocess + stdout parsing
+- No conversation persistence in MVP (lives in Zustand)
+- Claude CLI: `cmd.exe /c claude -p --output-format json --max-turns 1`
+- Pretty logs via structlog + rich (colored, structured)
+- All errors return `{ error: "CODE", message: "..." }` with proper HTTP status
+- Unhandled exceptions caught globally with full traceback logging

@@ -1,25 +1,31 @@
-"""PostgreSQL MCP Server — 4 read-only tools with error logging."""
+"""PostgreSQL MCP server with read-only tools and settings-backed connection."""
 from __future__ import annotations
 
 import json
 import logging
-import os
 
 import asyncpg
 from mcp.server.fastmcp import FastMCP
 
+from app.config import settings
+
 mcp = FastMCP("postgres")
 logger = logging.getLogger("mcp.postgres")
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
 _pool: asyncpg.Pool | None = None
+_pool_dsn: str | None = None
 
 
 async def _get_pool() -> asyncpg.Pool:
-    global _pool
-    if _pool is None:
+    global _pool, _pool_dsn
+
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL is not configured")
+
+    if _pool is None or _pool_dsn != settings.database_url:
         try:
-            _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
+            _pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=5)
+            _pool_dsn = settings.database_url
             logger.info("postgres_pool_created")
         except Exception as e:
             logger.error("postgres_pool_failed error=%s", str(e))
@@ -34,15 +40,17 @@ async def db_list_tables() -> str:
     try:
         pool = await _get_pool()
         async with pool.acquire() as conn:
-            rows = await conn.fetch("""
+            rows = await conn.fetch(
+                """
                 SELECT schemaname, tablename,
                        (SELECT count(*) FROM information_schema.columns
                         WHERE table_schema = t.schemaname AND table_name = t.tablename) as column_count
                 FROM pg_catalog.pg_tables t
                 WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
                 ORDER BY schemaname, tablename
-            """)
-            tables = [{"schema": r["schemaname"], "table": r["tablename"], "columns": r["column_count"]} for r in rows]
+                """
+            )
+            tables = [{"schema": row["schemaname"], "table": row["tablename"], "columns": row["column_count"]} for row in rows]
             logger.info("db_list_tables_result count=%d", len(tables))
             return json.dumps(tables, indent=2)
     except Exception as e:
@@ -61,19 +69,27 @@ async def db_get_schema(table: str) -> str:
     try:
         pool = await _get_pool()
         async with pool.acquire() as conn:
-            cols = await conn.fetch("""
+            cols = await conn.fetch(
+                """
                 SELECT column_name, data_type, is_nullable, column_default
                 FROM information_schema.columns
                 WHERE table_schema = $1 AND table_name = $2
                 ORDER BY ordinal_position
-            """, schema, tbl)
+                """,
+                schema,
+                tbl,
+            )
             if not cols:
                 logger.warning("db_get_schema_empty table=%s", table)
                 return json.dumps({"error": f"Table '{table}' not found or has no columns"})
             columns = [
-                {"name": c["column_name"], "type": c["data_type"],
-                 "nullable": c["is_nullable"] == "YES", "default": c["column_default"]}
-                for c in cols
+                {
+                    "name": col["column_name"],
+                    "type": col["data_type"],
+                    "nullable": col["is_nullable"] == "YES",
+                    "default": col["column_default"],
+                }
+                for col in cols
             ]
             logger.info("db_get_schema_result table=%s columns=%d", table, len(columns))
             return json.dumps({"table": table, "columns": columns}, indent=2)
@@ -87,9 +103,9 @@ async def db_query(sql: str, params: str = "[]") -> str:
     """Execute a read-only SQL query (SELECT only)."""
     logger.info("db_query sql=%s", sql[:100])
 
-    # Security: parse and validate
     try:
         import sqlparse
+
         parsed = sqlparse.parse(sql)
         for stmt in parsed:
             stmt_type = stmt.get_type()
@@ -111,11 +127,11 @@ async def db_query(sql: str, params: str = "[]") -> str:
         async with pool.acquire() as conn:
             async with conn.transaction(readonly=True):
                 rows = await conn.fetch(sql, *param_list)
-                results = [dict(r) for r in rows]
+                results = [dict(row) for row in rows]
                 for row in results:
-                    for k, v in row.items():
-                        if not isinstance(v, (str, int, float, bool, type(None))):
-                            row[k] = str(v)
+                    for key, value in row.items():
+                        if not isinstance(value, (str, int, float, bool, type(None))):
+                            row[key] = str(value)
                 truncated = len(results) > 100
                 if truncated:
                     results = results[:100]
@@ -135,7 +151,7 @@ async def db_explain_query(sql: str) -> str:
         async with pool.acquire() as conn:
             async with conn.transaction(readonly=True):
                 rows = await conn.fetch(f"EXPLAIN ANALYZE {sql}")
-                return "\n".join(r[0] for r in rows)
+                return "\n".join(row[0] for row in rows)
     except Exception as e:
         logger.error("db_explain_error sql=%s error=%s", sql[:100], str(e))
         return json.dumps({"error": f"EXPLAIN failed: {e}"})

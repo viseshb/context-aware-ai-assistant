@@ -109,7 +109,8 @@ export default function ApprovalForm() {
         <div className="glass rounded-2xl p-8 max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-error mx-auto mb-4" />
           <h1 className="text-xl font-bold mb-2">Error</h1>
-          <p className="text-text-muted">{message}</p>
+          <p className="text-text-muted mb-4">{message}</p>
+          <a href="/" className="text-sm text-text-muted hover:text-foreground transition-colors">&larr; Back to home</a>
         </div>
       </div>
     );
@@ -121,7 +122,8 @@ export default function ApprovalForm() {
         <div className="glass rounded-2xl p-8 max-w-md text-center">
           <CheckCircle className="w-12 h-12 text-cta mx-auto mb-4" />
           <h1 className="text-xl font-bold mb-2">Done</h1>
-          <p className="text-text-muted">{message}</p>
+          <p className="text-text-muted mb-4">{message}</p>
+          <a href="/admin" className="text-sm text-text-muted hover:text-foreground transition-colors">&larr; Back to admin panel</a>
         </div>
       </div>
     );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Wrench, ChevronDown, ChevronUp, CheckCircle, Loader2 } from "lucide-react";
+import { Wrench, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
 
 interface ToolExecutionCardProps {
   name: string;
@@ -27,7 +27,10 @@ export default function ToolExecutionCard({
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-panel-secondary/30 transition-colors cursor-pointer"
       >
         {status === "running" ? (
-          <Loader2 className="w-3.5 h-3.5 text-cta animate-spin shrink-0" />
+          <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+            <span className="absolute inset-0 rounded-full border border-cta/25 animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-cta shadow-[0_0_12px_rgba(34,197,94,0.4)]" />
+          </span>
         ) : (
           <CheckCircle className="w-3.5 h-3.5 text-cta shrink-0" />
         )}

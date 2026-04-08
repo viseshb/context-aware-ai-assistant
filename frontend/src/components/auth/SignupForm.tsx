@@ -183,10 +183,15 @@ export default function SignupForm() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-text-muted mt-6">
-          Already have an account?{" "}
-          <Link href="/login" className="text-cta hover:underline">Log in</Link>
-        </p>
+        <div className="text-center text-sm text-text-muted mt-6 space-y-2">
+          <p>
+            Already have an account?{" "}
+            <Link href="/login" className="text-cta hover:underline">Log in</Link>
+          </p>
+          <p>
+            <Link href="/" className="text-text-muted hover:text-foreground transition-colors">&larr; Back to home</Link>
+          </p>
+        </div>
       </motion.div>
     </div>
   );

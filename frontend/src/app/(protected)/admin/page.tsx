@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Bot } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
-import Header from "@/components/layout/Header";
 import AdminPanel from "@/components/admin/AdminPanel";
 
 export default function AdminPage() {
@@ -35,8 +34,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header />
+    <div className="h-full overflow-y-auto bg-background">
       <AdminPanel />
     </div>
   );

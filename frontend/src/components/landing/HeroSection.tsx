@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, GitBranch, MessageSquare, Database } from "lucide-react";
@@ -20,6 +20,34 @@ const DEMO_LINES = [
 
 export default function HeroSection() {
   const [visibleLines, setVisibleLines] = useState(0);
+
+  useLayoutEffect(() => {
+    const restoreScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      });
+    };
+
+    const previousScrollRestoration =
+      "scrollRestoration" in window.history
+        ? window.history.scrollRestoration
+        : null;
+
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    restoreScroll();
+    window.addEventListener("pageshow", restoreScroll);
+
+    return () => {
+      window.removeEventListener("pageshow", restoreScroll);
+      if (previousScrollRestoration) {
+        window.history.scrollRestoration = previousScrollRestoration;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (visibleLines < DEMO_LINES.length) {
@@ -47,7 +75,8 @@ export default function HeroSection() {
           {/* Left: Text content */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.35 }}
             transition={{ duration: 0.6 }}
           >
             {/* Badge */}
@@ -105,7 +134,8 @@ export default function HeroSection() {
           {/* Right: Animated chat preview */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: false, amount: 0.35 }}
             transition={{ duration: 0.6, delay: 0.2 }}
             className="relative"
           >

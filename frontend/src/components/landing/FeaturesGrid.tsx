@@ -63,7 +63,7 @@ export default function FeaturesGrid() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: false, amount: 0.35 }}
           transition={{ duration: 0.5 }}
           className="text-center mb-16"
         >
@@ -84,7 +84,7 @@ export default function FeaturesGrid() {
               key={feature.title}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={{ once: false, amount: 0.25 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="glass rounded-2xl p-6 hover:border-panel-secondary/50 transition-all duration-300 group cursor-pointer"
             >

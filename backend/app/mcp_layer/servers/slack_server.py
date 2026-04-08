@@ -1,30 +1,33 @@
-"""Slack MCP Server — 5 read-only tools with error logging."""
+"""Slack MCP server with read-only tools and settings-backed auth."""
 from __future__ import annotations
 
 import json
 import logging
-import os
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+from app.config import settings
 
 mcp = FastMCP("slack")
 logger = logging.getLogger("mcp.slack")
 
 SLACK_API = "https://slack.com/api"
-TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 
 
 def _headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
+    return {
+        "Authorization": f"Bearer {settings.slack_bot_token}",
+        "Content-Type": "application/json",
+    }
 
 
 async def _slack_get(method: str, params: dict | None = None) -> dict:
     """Shared GET helper with error handling."""
     async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.get(f"{SLACK_API}/{method}", headers=_headers(), params=params)
-        r.raise_for_status()
-        data = r.json()
+        response = await client.get(f"{SLACK_API}/{method}", headers=_headers(), params=params)
+        response.raise_for_status()
+        data = response.json()
         if not data.get("ok"):
             error = data.get("error", "unknown_error")
             logger.error("slack_api_error method=%s error=%s", method, error)
@@ -42,9 +45,13 @@ async def slack_search_messages(query: str, channel: str = "", count: int = 20) 
         if "error" in data:
             return json.dumps(data)
         matches = [
-            {"text": m["text"][:300], "user": m.get("username", "unknown"),
-             "channel": m.get("channel", {}).get("name", ""), "ts": m.get("ts", "")}
-            for m in data.get("messages", {}).get("matches", [])[:count]
+            {
+                "text": match["text"][:300],
+                "user": match.get("username", "unknown"),
+                "channel": match.get("channel", {}).get("name", ""),
+                "ts": match.get("ts", ""),
+            }
+            for match in data.get("messages", {}).get("matches", [])[:count]
         ]
         logger.info("slack_search_result count=%d", len(matches))
         return json.dumps(matches, indent=2)
@@ -62,9 +69,13 @@ async def slack_list_channels(limit: int = 100) -> str:
         if "error" in data:
             return json.dumps(data)
         channels = [
-            {"name": ch["name"], "id": ch["id"], "topic": ch.get("topic", {}).get("value", ""),
-             "member_count": ch.get("num_members", 0)}
-            for ch in data.get("channels", [])
+            {
+                "name": channel["name"],
+                "id": channel["id"],
+                "topic": channel.get("topic", {}).get("value", ""),
+                "member_count": channel.get("num_members", 0),
+            }
+            for channel in data.get("channels", [])
         ]
         logger.info("slack_list_channels_result count=%d", len(channels))
         return json.dumps(channels, indent=2)
@@ -82,8 +93,8 @@ async def slack_get_thread(channel: str, thread_ts: str) -> str:
         if "error" in data:
             return json.dumps(data)
         messages = [
-            {"text": m["text"][:500], "user": m.get("user", "unknown"), "ts": m["ts"]}
-            for m in data.get("messages", [])
+            {"text": message["text"][:500], "user": message.get("user", "unknown"), "ts": message["ts"]}
+            for message in data.get("messages", [])
         ]
         return json.dumps(messages, indent=2)
     except Exception as e:
@@ -100,9 +111,13 @@ async def slack_get_channel_history(channel: str, limit: int = 50) -> str:
         if "error" in data:
             return json.dumps(data)
         messages = [
-            {"text": m["text"][:500], "user": m.get("user", "unknown"),
-             "ts": m["ts"], "thread_ts": m.get("thread_ts")}
-            for m in data.get("messages", [])
+            {
+                "text": message["text"][:500],
+                "user": message.get("user", "unknown"),
+                "ts": message["ts"],
+                "thread_ts": message.get("thread_ts"),
+            }
+            for message in data.get("messages", [])
         ]
         return json.dumps(messages, indent=2)
     except Exception as e:
@@ -120,10 +135,15 @@ async def slack_get_user_info(user_id: str) -> str:
             return json.dumps(data)
         user = data.get("user", {})
         profile = user.get("profile", {})
-        return json.dumps({
-            "name": user.get("real_name", ""), "display_name": profile.get("display_name", ""),
-            "title": profile.get("title", ""), "status": profile.get("status_text", ""),
-        }, indent=2)
+        return json.dumps(
+            {
+                "name": user.get("real_name", ""),
+                "display_name": profile.get("display_name", ""),
+                "title": profile.get("title", ""),
+                "status": profile.get("status_text", ""),
+            },
+            indent=2,
+        )
     except Exception as e:
         logger.error("slack_get_user_error user_id=%s error=%s", user_id, str(e))
         return json.dumps({"error": f"Failed to get user info: {e}"})

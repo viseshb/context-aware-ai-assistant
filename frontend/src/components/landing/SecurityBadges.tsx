@@ -62,7 +62,7 @@ export default function SecurityBadges() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: false, amount: 0.35 }}
           transition={{ duration: 0.5 }}
           className="text-center mb-12"
         >
@@ -85,7 +85,7 @@ export default function SecurityBadges() {
               key={layer.title}
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
+              viewport={{ once: false, amount: 0.25 }}
               transition={{ duration: 0.3, delay: i * 0.05 }}
               className="glass rounded-xl p-4 text-center hover:border-cta/20 transition-colors cursor-pointer group"
             >

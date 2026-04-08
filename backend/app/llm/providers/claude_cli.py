@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import sys
 from typing import AsyncIterator
 
@@ -20,6 +21,30 @@ from app.utils.logging import get_logger
 log = get_logger("llm.claude_cli")
 
 CLI_TIMEOUT_SECONDS = 120
+TOOL_CALL_PATTERN = re.compile(
+    r"<tool_call\s+name=\"([^\"]+)\">\s*(.*?)\s*</tool_call>",
+    re.DOTALL,
+)
+
+
+def _extract_tool_call_events(text: str) -> tuple[str, list[ChatEvent]]:
+    events: list[ChatEvent] = []
+    for index, match in enumerate(TOOL_CALL_PATTERN.finditer(text), start=1):
+        tool_name = match.group(1).strip()
+        raw_args = match.group(2).strip()
+        try:
+            tool_args = json.loads(raw_args) if raw_args else {}
+        except json.JSONDecodeError:
+            tool_args = {"raw": raw_args}
+        events.append(ChatEvent(
+            type=ChatEventType.TOOL_CALL,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            tool_call_id=f"call_{tool_name}_{index}",
+        ))
+
+    cleaned = TOOL_CALL_PATTERN.sub("", text).strip()
+    return cleaned, events
 
 
 class ClaudeCLIProvider(LLMProvider):
@@ -28,7 +53,7 @@ class ClaudeCLIProvider(LLMProvider):
         self.model_id = "claude-cli"
         self.display_name = "Claude CLI"
         self.tier = "free"
-        self.supports_tools = False  # prompt-based, no native tool calling
+        self.supports_tools = True  # prompt-based tool calling via tagged text responses
         self.supports_streaming = True
 
     async def chat(
@@ -76,6 +101,7 @@ class ClaudeCLIProvider(LLMProvider):
             "--output-format", "json",      # structured output with usage stats
             "--max-turns", "1",             # single turn, no back-and-forth
             "--no-session-persistence",     # one-shot, no resume state
+            "--model", settings.claude_cli_model or "sonnet",
         ])
 
         log.info("claude_cli_start", cli_path=cli_path, prompt_len=len(prompt))
@@ -114,6 +140,12 @@ class ClaudeCLIProvider(LLMProvider):
                 usage = parsed.get("usage", {})
                 cost = parsed.get("total_cost_usd", 0)
                 model_used = list(parsed.get("modelUsage", {}).keys())
+                metrics = {
+                    "input_tokens": usage.get("input_tokens"),
+                    "output_tokens": usage.get("output_tokens"),
+                    "cost_usd": cost,
+                    "provider_model": model_used[0] if model_used else "",
+                }
 
                 log.info(
                     "claude_cli_success",
@@ -124,7 +156,11 @@ class ClaudeCLIProvider(LLMProvider):
                 )
 
                 if text:
-                    yield ChatEvent(type=ChatEventType.TEXT_CHUNK, content=text)
+                    cleaned_text, tool_events = _extract_tool_call_events(text)
+                    if cleaned_text:
+                        yield ChatEvent(type=ChatEventType.TEXT_CHUNK, content=cleaned_text)
+                    for event in tool_events:
+                        yield event
                 else:
                     log.warning("claude_cli_no_text", keys=list(parsed.keys()))
                     yield ChatEvent(
@@ -132,12 +168,17 @@ class ClaudeCLIProvider(LLMProvider):
                         content=stdout,  # fallback: return raw output
                     )
 
-            except json.JSONDecodeError:
-                # CLI didn't return JSON — return raw text
-                log.warning("claude_cli_non_json_output", output_len=len(stdout))
-                yield ChatEvent(type=ChatEventType.TEXT_CHUNK, content=stdout)
+                yield ChatEvent(type=ChatEventType.DONE, metrics=metrics)
 
-            yield ChatEvent(type=ChatEventType.DONE)
+            except json.JSONDecodeError:
+                # CLI didn't return JSON - return raw text
+                log.warning("claude_cli_non_json_output", output_len=len(stdout))
+                cleaned_text, tool_events = _extract_tool_call_events(stdout)
+                if cleaned_text:
+                    yield ChatEvent(type=ChatEventType.TEXT_CHUNK, content=cleaned_text)
+                for event in tool_events:
+                    yield event
+                yield ChatEvent(type=ChatEventType.DONE)
 
         except asyncio.TimeoutError:
             log.error("claude_cli_timeout", timeout_s=CLI_TIMEOUT_SECONDS)

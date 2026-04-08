@@ -21,7 +21,7 @@ interface AuthState {
   error: string | null;
 
   signup: (username: string, email: string, password: string, teamCode: string) => Promise<"active" | "pending">;
-  login: (email: string, password: string) => Promise<"active" | "pending">;
+  login: (username: string, password: string) => Promise<"active" | "pending">;
   logout: () => void;
   loadFromStorage: () => Promise<void>;
 }
@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  login: async (email, password) => {
+  login: async (username, password) => {
     set({ isLoading: true, error: null });
     try {
       const res = await fetch(
@@ -75,7 +75,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ username, password }),
         }
       );
       const data = await res.json();

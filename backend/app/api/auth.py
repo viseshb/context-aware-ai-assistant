@@ -105,29 +105,29 @@ async def login(
     body: LoginRequest,
     user_service: UserService = Depends(get_user_service),
 ) -> TokenResponse | PendingResponse:
-    log.info("login_attempt", email=body.email)
+    log.info("login_attempt", username=body.username)
 
     try:
-        user = await user_service.authenticate(body.email, body.password)
+        user = await user_service.authenticate(body.username, body.password)
     except Exception as e:
-        log.error("login_db_error", error=str(e), email=body.email)
+        log.error("login_db_error", error=str(e), username=body.username)
         raise DatabaseError("Authentication service unavailable") from e
 
     if not user:
-        log.warning("login_failed", email=body.email, reason="invalid_credentials")
-        audit_logger.log_event("auth_login_failed", details=f"Failed login for {body.email}")
-        raise AuthenticationError("Invalid email or password")
+        log.warning("login_failed", username=body.username, reason="invalid_credentials")
+        audit_logger.log_event("auth_login_failed", details=f"Failed login for {body.username}")
+        raise AuthenticationError("Invalid username or password")
 
     # Check user status
     status = user.get("status", "active")
 
     if status == "pending":
-        log.info("login_pending_user", email=body.email)
+        log.info("login_pending_user", username=body.username)
         pending_token = create_access_token({"sub": user["id"], "purpose": "pending_check"})
         return PendingResponse(pending_token=pending_token)
 
     if status == "rejected":
-        log.warning("login_rejected_user", email=body.email)
+        log.warning("login_rejected_user", username=body.username)
         raise AuthorizationError("Your signup request was denied. Contact the admin.")
 
     token = create_access_token({"sub": user["id"], "role": user["role"]})

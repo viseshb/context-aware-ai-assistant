@@ -3,6 +3,7 @@ import HeroSection from "@/components/landing/HeroSection";
 import FeaturesGrid from "@/components/landing/FeaturesGrid";
 import HowItWorks from "@/components/landing/HowItWorks";
 import SecurityBadges from "@/components/landing/SecurityBadges";
+import WorkflowGraphSection from "@/components/landing/WorkflowGraphSection";
 import CTAFooter from "@/components/landing/CTAFooter";
 import Footer from "@/components/landing/Footer";
 
@@ -14,6 +15,7 @@ export default function LandingPage() {
       <FeaturesGrid />
       <HowItWorks />
       <SecurityBadges />
+      <WorkflowGraphSection />
       <CTAFooter />
       <Footer />
     </>

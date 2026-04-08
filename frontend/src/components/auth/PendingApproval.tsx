@@ -128,6 +128,12 @@ export default function PendingApproval() {
                 />
               ))}
             </div>
+            <button
+              onClick={() => { logout(); router.push("/"); }}
+              className="mt-6 text-sm text-text-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              &larr; Back to home
+            </button>
           </>
         )}
 

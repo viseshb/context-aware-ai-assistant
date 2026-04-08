@@ -19,6 +19,19 @@ export interface WSMessage {
   code?: string;
   tool?: { name: string; args: Record<string, unknown>; result?: unknown; duration_ms?: number };
   context_sources?: { type: string; detail: string }[];
+  tool_calls?: { name: string; args: Record<string, unknown>; result?: unknown; duration_ms?: number; status: string }[];
+  metrics?: {
+    model_id: string;
+    ttft_ms?: number | null;
+    total_time_ms?: number;
+    tool_time_ms?: number;
+    tool_call_count?: number;
+    input_tokens?: number | null;
+    output_tokens?: number | null;
+    cost_usd?: number | null;
+    provider_model?: string;
+    response_chars?: number;
+  };
   summary?: string | null;
   user?: { id: string; username: string; role: string };
 }

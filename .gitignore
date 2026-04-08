@@ -36,6 +36,7 @@ frontend/out/
 .claude/
 .mcp.json
 .opencode.json
+notes.txt
 *.swp
 *.swo
 *~

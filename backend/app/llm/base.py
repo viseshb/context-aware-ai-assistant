@@ -22,6 +22,7 @@ class ChatEvent:
     tool_args: dict = field(default_factory=dict)
     tool_call_id: str = ""
     error: str = ""
+    metrics: dict = field(default_factory=dict)
 
 
 @dataclass

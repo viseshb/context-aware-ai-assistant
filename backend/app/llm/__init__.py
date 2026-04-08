@@ -14,14 +14,17 @@ def create_registry() -> LLMRegistry:
 
     # Gemini models (Google)
     if settings.google_api_key:
-        from app.llm.providers.gemini import GeminiProvider
-        for model_id in [
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
-            "gemini-3.1-flash-lite",
-            "gemini-3-flash",
-        ]:
-            registry.register(GeminiProvider(model_id))
+        from app.llm.providers.gemini import GeminiProvider, gemini_sdk_available
+        if gemini_sdk_available():
+            for model_id in [
+                "gemini-2.5-flash-lite",
+                "gemini-2.5-flash",
+                "gemini-3.1-flash-lite",
+                "gemini-3-flash",
+            ]:
+                registry.register(GeminiProvider(model_id))
+        else:
+            log.warning("google_sdk_missing", msg="Gemini SDK not installed; Gemini models not available")
     else:
         log.warning("google_api_key_missing", msg="Gemini models not available")
 
@@ -39,8 +42,11 @@ def create_registry() -> LLMRegistry:
 
     # Claude API
     if settings.anthropic_api_key:
-        from app.llm.providers.claude_api import ClaudeAPIProvider
-        registry.register(ClaudeAPIProvider())
+        from app.llm.providers.claude_api import ClaudeAPIProvider, anthropic_sdk_available
+        if anthropic_sdk_available():
+            registry.register(ClaudeAPIProvider())
+        else:
+            log.warning("anthropic_sdk_missing", msg="Anthropic SDK not installed; Claude API not available")
     else:
         log.warning("anthropic_api_key_missing", msg="Claude API not available")
 

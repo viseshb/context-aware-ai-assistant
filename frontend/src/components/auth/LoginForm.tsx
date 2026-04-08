@@ -10,7 +10,7 @@ import { useAuthStore } from "@/stores/authStore";
 export default function LoginForm() {
   const router = useRouter();
   const { login, isLoading } = useAuthStore();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -19,7 +19,7 @@ export default function LoginForm() {
     e.preventDefault();
     setError("");
     try {
-      await login(email, password);
+      await login(username, password);
       router.push("/chat");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -46,17 +46,18 @@ export default function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="login-email" className="block text-sm font-medium text-text-muted mb-1">
-              Email
+            <label htmlFor="login-username" className="block text-sm font-medium text-text-muted mb-1">
+              Username
             </label>
             <input
-              id="login-email"
-              type="email"
+              id="login-username"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2.5 bg-panel-secondary/30 border border-border rounded-lg text-foreground placeholder:text-text-muted/50 focus:outline-none focus:border-cta/50 transition-colors"
-              placeholder="you@example.com"
+              placeholder="Enter your username"
+              autoComplete="username"
             />
           </div>
 
@@ -73,6 +74,7 @@ export default function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 pr-10 bg-panel-secondary/30 border border-border rounded-lg text-foreground placeholder:text-text-muted/50 focus:outline-none focus:border-cta/50 transition-colors"
                 placeholder="Enter your password"
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -102,10 +104,15 @@ export default function LoginForm() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-text-muted mt-6">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-cta hover:underline">Sign up</Link>
-        </p>
+        <div className="text-center text-sm text-text-muted mt-6 space-y-2">
+          <p>
+            Joining a team?{" "}
+            <Link href="/signup?mode=team" className="text-cta hover:underline">Sign up with team code</Link>
+          </p>
+          <p>
+            <Link href="/" className="text-text-muted hover:text-foreground transition-colors">&larr; Back to home</Link>
+          </p>
+        </div>
       </motion.div>
     </div>
   );

@@ -22,7 +22,7 @@ NVIDIA_MODELS = {
     },
     "nvidia/ministral-14b": {
         "display": "Ministral 14B",
-        "api_model": "mistralai/ministral-8b-instruct",
+        "api_model": "mistralai/ministral-14b-instruct-2512",
     },
     "nvidia/kimi-k2": {
         "display": "Kimi K2",
@@ -76,6 +76,8 @@ class NvidiaProvider(LLMProvider):
             "messages": messages_to_openai_format(messages),
             "stream": stream,
         }
+        if self.model_id == "nvidia/kimi-k2":
+            kwargs["temperature"] = 0
         if tools:
             kwargs["tools"] = tools_to_openai_format(tools)
         return kwargs
