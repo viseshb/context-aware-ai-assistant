@@ -2,7 +2,7 @@
 
 > **An AI-powered assistant that connects to your GitHub, Slack, and PostgreSQL — letting you query code, conversations, and data using plain English.**
 
-Built with the **Model Context Protocol (MCP)**, FastAPI, and Next.js. Not just another chatbot — a context-aware system that understands *where* your data lives and *how* to get it.
+Built with the **Model Context Protocol (MCP)**, FastAPI, and Next.js. Not just another chatbot a context-aware system that understands *where* your data lives and *how* to get it.
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue) ![Next.js](https://img.shields.io/badge/Next.js-16.2-black) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green) ![MCP](https://img.shields.io/badge/MCP-1.27-orange) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
@@ -170,8 +170,8 @@ User sees: answer + tool execution cards + source badges
 ### 1. Clone & Configure
 
 ```bash
-git clone https://github.com/viseshb/context-aware-ai-assistant-.git
-cd context-aware-ai-assistant-
+git clone https://github.com/your-org/context-aware-ai-assistant.git
+cd context-aware-ai-assistant
 cp .env.example .env
 ```
 
@@ -189,8 +189,10 @@ cd backend && pip install -r requirements.txt && cd ..  # Backend: FastAPI
 
 ```bash
 cd backend
-python -m app.security.jwt_auth create-admin --username admin --email admin@local
+python -m app.security.jwt_auth create-admin --username solo-admin --email admin@example.com
 ```
+
+The local auth database used by the app in development is typically `backend/users.db`. Login is username-based, so you sign in with the admin username you created here, not the email address.
 
 ### 4. Start Development Server
 
@@ -202,7 +204,11 @@ Starts **both** backend (`[API]` on port 8000) and frontend (`[WEB]` on port 300
 
 ### 5. Open in Browser
 
-Visit **http://localhost:3000** → Sign up → Select a model → Start chatting!
+Visit **http://localhost:3000**.
+
+- In **solo mode**, go to login and sign in with your username
+- In **team mode**, sign up with your team code and wait for approval
+- After entering chat, continue past the intro screen and choose a model from the chat composer
 
 ---
 
@@ -280,7 +286,7 @@ context-aware-ai-assistant/
 │   │   ├── landing/        # Hero, features grid, security badges, contact
 │   │   ├── auth/           # Login, signup forms
 │   │   ├── chat/           # Chat area, messages, input, streaming
-│   │   ├── model/          # Model selector card grid, badge
+│   │   ├── model/          # Model badges and related UI helpers
 │   │   ├── rich/           # Markdown renderer, code blocks
 │   │   ├── admin/          # User management, audit viewer
 │   │   └── ui/             # Shared glass cards, buttons, badges
@@ -320,4 +326,4 @@ npm run create-admin   # Create admin user
 
 ## License
 
-MIT License — Created by **Visesh Bentula**
+MIT License
